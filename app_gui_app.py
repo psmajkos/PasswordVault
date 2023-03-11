@@ -12,6 +12,7 @@ from cryptography.fernet import Fernet
 import hashlib
 import faulthandler
 import sys
+import sqlite3
 faulthandler.enable(file=sys.stderr, all_threads=True)
 faulthandler.dump_traceback()
 
@@ -23,34 +24,21 @@ with open('key.key', 'rb') as key_file:
 
 fernet = Fernet(key)
 
-#Creating Connection to database
+#Creating Connection and database
 def get_conn():
-    return create_engine("mysql+pymysql://admin:QUS&hdji1*^gDg3hs@localhost:3306/basement")
-    #return create_engine("mysql+pymysql://root:Pcf85830@localhost/basement")
-#Creating database
-def create_db():
-    my_conn = create_engine("mysql+pymysql://admin:QUS&hdji1*^gDg3hs@localhost:3306/basement")
-    #my_conn = create_engine("mysql+pymysql://root:Pcf85830@localhost/")
-    my_conn.execute("""CREATE SCHEMA IF NOT EXISTS basement""")
+    return sqlite3.connect("basement.db")
 
-create_db()
 #Creating tables in database
-def create_table():
-    my_conn = get_conn()
-    my_conn.execute("""CREATE TABLE IF NOT EXISTS `basement`.`password` (
-    `id` INT NOT NULL AUTO_INCREMENT,
-    `password` VARCHAR(300) NOT NULL,
-    PRIMARY KEY (`id`));""")
+my_conn = get_conn()
+my_conn.execute('''CREATE TABLE IF NOT EXISTS password
+                (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                password varchar(300) NOT NULL)''')
 
-    my_conn.execute("""
-    CREATE TABLE IF NOT EXISTS `basement`.`dane` (
-    `id` INT NOT NULL AUTO_INCREMENT,
-    `platform` VARCHAR(45) NOT NULL,
-    `login` VARCHAR(45) NOT NULL,
-    `password` VARCHAR(300) NOT NULL,
-    PRIMARY KEY (`id`));""")
-create_table()
-
+my_conn.execute('''CREATE TABLE IF NOT EXISTS dane
+                (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                platform varchar(45) NOT NULL,
+                login varchar(45) NOT NULL,
+                password varchar(300) NOT NULL)''')
 
 #Function to create database Backup 
 def settings():
@@ -332,9 +320,10 @@ def main():
         # print the encrypted message as a string
         password = encrypted_message.decode()
 
-        insert_query = "INSERT INTO dane(platform, login, password) VALUES (%s,%s,%s)"
-        vals = (site, login, password) #password
+        insert_query = """INSERT INTO dane(platform, login, password) VALUES (?,?,?)"""
+        vals = (site, login, password,) #password
         my_conn.execute(insert_query,vals)
+        my_conn.commit()
         msg.showinfo(title=None, message="Account added successfully")
         insert.destroy()
         refresh()
@@ -394,12 +383,12 @@ def create_master_password():
             hash.update(mstr_entry.get().encode())
             hash_hex = hash.hexdigest()
 
-            insert_query = "INSERT INTO password(password) VALUES (%s)"
-            vals = (hash_hex)
+            insert_query = """INSERT INTO password(password) VALUES (?)"""
+            vals = (hash_hex,)
             my_conn.execute(insert_query,vals)
+            my_conn.commit()
             root.destroy()
             main()
-
         else:
             mstr_label.config(text="Passwords don't match")
 
@@ -438,7 +427,7 @@ def loginscreen():
     root1.mainloop()
 
 my_conn = get_conn()
-login_pass = my_conn.execute("SELECT password FROM password").fetchone()
+login_pass = my_conn.execute("""SELECT password FROM password""").fetchone()
 if login_pass is None:
     create_master_password()
 else:
