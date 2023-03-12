@@ -113,6 +113,11 @@ def main():
   canvas = tk.Canvas(root, width=900, height=300)
   scrollbar = ttk.Scrollbar(root, orient="vertical", command=canvas.yview)
 
+  def on_mousewheel(event):
+    canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+  canvas.bind_all("<MouseWheel>", on_mousewheel)
+
   # Create a frame widget inside the canvas widget to hold the rows of data
   frame = tk.Frame(canvas)
 
@@ -122,7 +127,7 @@ def main():
   # Add the frame widget to the canvas widget
   canvas.create_window((0, 0), window=frame, anchor="nw")
 
-  # Add the canvas widget and the scrollbar widget to the GUI
+  # Add the canvas widget 
   canvas.pack(side="left", fill="both", expand=True)
   canvas.place(x=0, y=0)
   scrollbar.pack(side="right", fill="both")
@@ -131,7 +136,6 @@ def main():
   def my_show():
       for w in display.grid_slaves(): # remove all rows first 
           w.grid_forget() # remove rows 
-      # Create a canvas widget and a scrollbar widget
       
       # Function to enumerate all rows
       p_set= my_conn.execute('SELECT login FROM dane')
@@ -171,11 +175,11 @@ def main():
           ttk.Separator(master=frame, orient=HORIZONTAL, style='blue.TSeparator', class_= ttk.Separator,
           takefocus= 1, cursor='plus').grid(row=1, columnspan=20, pady=15, sticky="nsew")
 
-          delete_button = ttk.Button(frame, text='Delete', width=5, command=lambda d=student[0], n=student[1]: my_delete(d, n))
+          delete_button = ttk.Button(frame, text='Delete', width=6, command=lambda d=student[0], n=student[1]: my_delete(d, n))
           delete_button.grid(row=i+2, column=len(student)+2)
-          copy_button = ttk.Button(frame, text='Copy', width=4, command=lambda id=student[0], name=student[1]: my_copy(id, name))
+          copy_button = ttk.Button(frame, text='Copy', width=5, command=lambda id=student[0], name=student[1]: my_copy(id, name))
           copy_button.grid(row=i+2, column=5)
-          edit_button = ttk.Button(frame, text='Edit', width=3, command=lambda id=student[0], name=student[1]: my_edit(id, name))
+          edit_button = ttk.Button(frame, text='Edit', width=4, command=lambda id=student[0], name=student[1]: my_edit(id, name))
           edit_button.grid(row=i+2, column=7)
 
 
@@ -222,7 +226,10 @@ def main():
             # print the encrypted message as a string
             password = encrypted_message.decode()
 
-            update_query = "UPDATE dane SET login=%s, password=%s, platform=%s WHERE id=%s"
+            update_query = """UPDATE dane
+            SET platform = ?, login = ?, password = ?
+            WHERE id = ?;
+            """
 
             vals = (login, password, site, id) #password
             my_conn.execute(update_query,vals)
@@ -230,7 +237,7 @@ def main():
             insert.destroy()
             refresh()
 
-    button_edit = tk.Button(frame, text="Edit", font=('verdana',14), command = editData) # EditData
+    button_edit = ttk.Button(frame, text="Edit", command = editData) 
     button_edit.grid(row=4,column=0, columnspan=2, pady=10, padx=10, sticky='nsew')
     site_label.grid(row=0, column=0)
     site_entry.grid(row=0, column=1, pady=10, padx=10)
@@ -245,10 +252,12 @@ def main():
 
   # Function to deleted selected row from database 
   def my_delete(id,name):
-      my_var=msg.askyesnocancel("Delete?",\
+      my_var=msg.askyesno("Delete?",\
           "Delete" + ' ' + name + '?', icon='warning',default='no')
       if my_var:
-          r_set=my_conn.execute('DELETE FROM dane WHERE id='+str(id))
+          my_conn.execute('DELETE FROM dane WHERE id = ?', (id,))
+          my_conn.commit()
+          
           msg.showerror("Deleted","Record Deleted")
           refresh()
           #my_show()
@@ -270,7 +279,7 @@ def main():
             decrypted = decrypted_message.decode()
 
             pyperclip.copy(decrypted)
-          msg.showinfo(title=None, message="Copied to clipboard " + decrypted)
+          msg.showinfo(title=None, message="Copied to clipboard: " + decrypted)
 
   # Funtion to refresh all records from database
   def refresh():
@@ -295,12 +304,13 @@ def main():
     site_label = tk.Label(frame, text="Platform: ", font=('verdana',12), bg=bkg)
     n = StringVar()
     n = set()
-    site_entry = ttk.Combobox(frame, textvariable=n)
+    site_combo = ttk.Combobox(frame, textvariable=n)
+    site_combo.set("Select site")
     # Here is saved sites 
     with open('sites_json.json', 'r') as file:
         sites = json.load(file)
         for site in sites:
-            site_entry['values'] = sites['site_name']
+            site_combo['values'] = sites['site_name']
     login_label = tk.Label(frame, text="Login: ", font=('verdana',12), bg=bkg)
     login_entry = tk.Entry(frame, font=('verdana',12))
 
@@ -309,7 +319,7 @@ def main():
 
     # Funtion to insert a new record
     def insertData():
-        site = site_entry.get()
+        site = site_combo.get()
         login = login_entry.get()
         message = password_entry.get()
         putted_password = message.encode('utf-8')
@@ -328,11 +338,10 @@ def main():
         insert.destroy()
         refresh()
 
-    button_insert = tk.Button(frame, text="Insert", font=('verdana',14), bg='orange',
-                            command = insertData) # insertData
+    button_insert = ttk.Button(frame, text="Insert", command = insertData) # insertData
     
     site_label.grid(row=0, column=0)
-    site_entry.grid(row=0, column=1, pady=10, padx=10)
+    site_combo.grid(row=0, column=1, pady=10, padx=10)
     login_label.grid(row=1, column=0)
     login_entry.grid(row=1, column=1, pady=10, padx=10)
     password_label.grid(row=2, column=0, sticky='e')
