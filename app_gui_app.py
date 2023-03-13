@@ -153,15 +153,15 @@ def main():
       r_set = my_conn.execute('SELECT id, platform, login, password FROM dane')
       for i, student in enumerate(r_set):
           for j in range(1,len(student)):
-              e=tk.Label(frame,width=12,fg='black',text=student[j],
+              e=tk.Label(frame,width=20,fg='black',text=student[j],
               anchor='center')
               e.grid(row=i+2,column=j)
 
           b = StringVar()
           b.set("*******")
           for j in range(3,len(student)):
-              b=tk.Entry(frame,width=30,fg='white',show="*", bg='purple', justify=CENTER,highlightthickness=0, borderwidth=0, textvariable=b)
-              b.grid(row=i+2,column=j)
+              b=tk.Entry(frame,width=35,fg='white',show="*", bg='purple', justify=CENTER,highlightthickness=0, borderwidth=0, textvariable=b)
+              b.grid(row=i+2,column=j, padx=48)
 
           no = tk.Label(frame, text="No.")
           no.grid(row=0, column=0)
@@ -173,13 +173,13 @@ def main():
           password.grid(row=0, column=3)
 
           ttk.Separator(master=frame, orient=HORIZONTAL, style='blue.TSeparator', class_= ttk.Separator,
-          takefocus= 1, cursor='plus').grid(row=1, columnspan=20, pady=15, sticky="nsew")
+          takefocus= 1, cursor='plus').grid(row=1, columnspan=20, pady=15, padx=25, sticky="nsew")
 
-          delete_button = ttk.Button(frame, text='Delete', width=6, command=lambda d=student[0], n=student[1]: my_delete(d, n))
+          delete_button = ttk.Button(frame, text='Delete', width=8, command=lambda d=student[0], n=student[1]: my_delete(d, n))
           delete_button.grid(row=i+2, column=len(student)+2)
-          copy_button = ttk.Button(frame, text='Copy', width=5, command=lambda id=student[0], name=student[1]: my_copy(id, name))
+          copy_button = ttk.Button(frame, text='Copy', width=7, command=lambda id=student[0], name=student[1]: my_copy(id, name))
           copy_button.grid(row=i+2, column=5)
-          edit_button = ttk.Button(frame, text='Edit', width=4, command=lambda id=student[0], name=student[1]: my_edit(id, name))
+          edit_button = ttk.Button(frame, text='Edit', width=6, command=lambda id=student[0], name=student[1]: my_edit(id, name))
           edit_button.grid(row=i+2, column=7)
 
 
@@ -350,6 +350,7 @@ def main():
     frame.grid(row=0, column=0)
     insert.mainloop()
     insert.update()
+    
   app = ttk.Frame(root, width=10, height=10)
   from main_pass_gen import gen
 
@@ -366,7 +367,7 @@ def main():
   add_site_json_button.pack(side=LEFT, anchor=CENTER)
   settings_button.pack(side=LEFT, anchor=CENTER)
 
-  app.place(x=170, y=315)
+  app.place(x=250, y=315)
 
   root.mainloop()
 
@@ -407,9 +408,12 @@ def create_master_password():
     root.mainloop()
 
 def loginscreen():
-    root1 = Tk()
-    login_label = ttk.Label(root1, text="Enter your password")
-    login_entry = ttk.Entry(root1, show="*")
+    root = Tk()
+    root.geometry("850x350")
+    root.title("Loginscreen")
+    login_label = ttk.Label(root, text="Enter your password")
+    login_entry = ttk.Entry(root, show="*")
+    login_entry.focus()
 
     login_label.pack()
     login_entry.pack()
@@ -426,14 +430,14 @@ def loginscreen():
                 password_matched = True
                 break
         if password_matched:
-            root1.destroy()
+            root.destroy()
             main()
         else:
             login_label.configure(text="Retype password")
             login_entry.delete(0, tk.END)
 
-    root1.bind('<Return>', lambda event=None: login())
-    root1.mainloop()
+    root.bind('<Return>', lambda event=None: login())
+    root.mainloop()
 
 my_conn = get_conn()
 login_pass = my_conn.execute("""SELECT password FROM password""").fetchone()
