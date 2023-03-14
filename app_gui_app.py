@@ -7,6 +7,16 @@ import json
 from cryptography.fernet import Fernet
 import hashlib
 import sqlite3
+import wmi
+
+def get_hwid():
+    c = wmi.WMI()
+    # Get the hardware ID of the first disk drive
+    for disk in c.Win32_DiskDrive():
+        return disk.SerialNumber.strip()
+hwid = get_hwid()
+# print("Hardware ID:", hwid)
+
 
 # read the key from a file
 with open('key.key', 'rb') as key_file:
@@ -17,6 +27,32 @@ fernet = Fernet(key)
 #Creating Connection and database
 def get_conn():
     return sqlite3.connect("basement.db")
+
+#Creating tables in database
+my_conn = get_conn()
+my_conn.execute('''CREATE TABLE IF NOT EXISTS hwid
+                (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hwid varchar(300) NOT NULL)''')
+
+my_conn.execute('''CREATE TABLE IF NOT EXISTS password
+                (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                password varchar(300) NOT NULL)''')
+
+my_conn.execute('''CREATE TABLE IF NOT EXISTS dane
+                (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                platform varchar(45) NOT NULL,
+                login varchar(45) NOT NULL,
+                password varchar(300) NOT NULL)''')
+
+
+def insert_hwid():
+    my_conn = get_conn()
+
+    insert_query = """INSERT INTO hwid(hwid) VALUES (?)"""
+    vals = (hwid,)
+    my_conn.execute(insert_query,vals)
+    my_conn.commit()
+insert_hwid()
 
 #Function to make main window
 def main():
@@ -105,28 +141,37 @@ def main():
         info_label_login.pack(pady=40)
 
         def login():
-            my_conn = get_conn()
-            p_set = my_conn.execute('SELECT password FROM password')
-            hash = hashlib.sha512()
-            hash.update(login_entry.get().encode())
-            hash_hex = hash.hexdigest()
-            password_matched = False
-            for password in p_set:
-                if hash_hex == password[0]:
-                    password_matched = True
+            hwid_check = my_conn.execute('SELECT hwid FROM hwid')
+            hwid_matched = False
+            for hw in hwid_check:
+                if hwid == hw[0]:
+                    hwid_matched = True
                     break
-            if password_matched:
-                #root.destroy()
-                login_entry.destroy()
-                login_label.destroy()
-                info_label_login.destroy()
-                root.update_idletasks()
-                my_show()
-            else:
-                login_label.configure(text="Retype password")
-                login_entry.delete(0, tk.END)
 
+            if hwid_matched:
+                p_set = my_conn.execute('SELECT password FROM password')
+                hash = hashlib.sha512()
+                hash.update(login_entry.get().encode())
+                hash_hex = hash.hexdigest()
+                password_matched = False
+                for password in p_set:
+                    if hash_hex == password[0]:
+                        password_matched = True
+                        break
+                if password_matched:
+                    #root.destroy()
+                    login_entry.destroy()
+                    login_label.destroy()
+                    info_label_login.destroy()
+                    root.update_idletasks()
+                    my_show()
+                else:
+                    login_label.configure(text="Retype password")
+                    login_entry.delete(0, tk.END)
+            else:
+                login_label.configure(text = "Wrong computer")
         root.bind('<Return>', lambda event=None: login())
+
 
     my_conn = get_conn()
     login_pass = my_conn.execute("""SELECT password FROM password""").fetchone()
@@ -479,17 +524,5 @@ def add_suggested():
     button.pack()
 
     root.mainloop()
-
-#Creating tables in database
-my_conn = get_conn()
-my_conn.execute('''CREATE TABLE IF NOT EXISTS password
-                (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                password varchar(300) NOT NULL)''')
-
-my_conn.execute('''CREATE TABLE IF NOT EXISTS dane
-                (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                platform varchar(45) NOT NULL,
-                login varchar(45) NOT NULL,
-                password varchar(300) NOT NULL)''')
 
 main()
