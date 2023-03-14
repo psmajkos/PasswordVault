@@ -6,7 +6,6 @@ import pyperclip
 import json
 from cryptography.fernet import Fernet
 import hashlib
-
 import sqlite3
 
 # read the key from a file
@@ -24,7 +23,6 @@ def main():
     root = Tk()
     root.title("Vault")
     root.geometry("850x350")
-    #root.configure(background='black')
     root.resizable(False, False)
     root.minsize(850, 350)   # Lock the minimum size of the window
     root.maxsize(850, 350)   # Lock the maximum size of the window
@@ -136,7 +134,6 @@ def main():
         create_master_password()
     else:
         loginscreen()
-    #loginscreen()
 
     # Function to display rows from database
     def my_show():
@@ -443,9 +440,6 @@ def settings():
 
     spacer = Label(root)
     spacer.grid(column=0, row=3)
-
-    # delete_db_button = ttk.Button(root, text="delete database", command=delete_db)
-    # delete_db_button.grid(column=0, row=4)
     root.mainloop()
 
 def add_suggested():
