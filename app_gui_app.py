@@ -1,22 +1,13 @@
-import faulthandler; faulthandler.enable()
-from tkinter import Tk, Label, StringVar, ttk, Scrollbar, CENTER, LEFT, HORIZONTAL, X
+from tkinter import Tk, Label, StringVar, ttk, CENTER, LEFT, HORIZONTAL, X
 import tkinter  as tk 
-import time
 from tkinter import messagebox as msg
 import pyperclip
-from sqlalchemy import create_engine
-from backup import db_upload, db_backup
-from settings import delete_db
+#from backup import db_upload, db_backup
 import json
 from cryptography.fernet import Fernet
 import hashlib
-import faulthandler
-import sys
-import sqlite3
-faulthandler.enable(file=sys.stderr, all_threads=True)
-faulthandler.dump_traceback()
 
-faulthandler.enable()
+import sqlite3
 
 # read the key from a file
 with open('key.key', 'rb') as key_file:
@@ -79,6 +70,9 @@ def main():
 
         def save_password():
             if mstr_entry.get() == mstr_entry_retype.get():
+                if len(mstr_entry.get()) < 6:
+                    mstr_label.config(text="Password must be at least 6 characters long")
+                    return
                 my_conn = get_conn()
                 hash = hashlib.sha512()
                 hash.update(mstr_entry.get().encode())
@@ -172,8 +166,8 @@ def main():
                 anchor='center')
                 e.grid(row=b+2,column=k)
 
-        index += 1
-        b=b+1
+            index += 1
+            b=b+1
     # Add the rows of data to the frame widget
         r_set = my_conn.execute('SELECT id, platform, login, password FROM dane')
         for i, student in enumerate(r_set):
@@ -244,14 +238,15 @@ def main():
                 WHERE id = ?;
                 """
 
-                vals = (login, password, site, id) #password
+                vals = (site, login, password, id) #password
                 my_conn.execute(update_query,vals)
-                msg.showinfo(title=None, message="Account added successfully")
+                my_conn.commit()
+                msg.showinfo(title=None, message="Account edited successfully")
                 insert.destroy()
                 refresh()
 
-        button_edit = ttk.Button(frame, text="Edit", command = editData) 
-        button_edit.grid(row=4,column=0, columnspan=2, pady=10, padx=10, sticky='nsew')
+        insert.bind('<Return>', lambda event=None: editData())
+
         site_label.grid(row=0, column=0)
         site_entry.grid(row=0, column=1, pady=10, padx=10)
         login_label.grid(row=1, column=0)
@@ -318,7 +313,7 @@ def main():
         n = StringVar()
         n = set()
         site_combo = ttk.Combobox(frame, textvariable=n)
-        site_combo.set("Select site")
+        site_combo.set("Facebook")
         # Here is saved sites 
         with open('sites_json.json', 'r') as file:
             sites = json.load(file)
@@ -351,7 +346,7 @@ def main():
             insert.destroy()
             refresh()
 
-        button_insert = ttk.Button(frame, text="Insert", command = insertData) # insertData
+        insert.bind('<Return>', lambda event=None: insertData())
 
         site_label.grid(row=0, column=0)
         site_combo.grid(row=0, column=1, pady=10, padx=10)
@@ -359,7 +354,6 @@ def main():
         login_entry.grid(row=1, column=1, pady=10, padx=10)
         password_label.grid(row=2, column=0, sticky='e')
         password_entry.grid(row=2, column=1, pady=10, padx=10)
-        button_insert.grid(row=4,column=0, columnspan=2, pady=10, padx=10, sticky='nsew')
         frame.grid(row=0, column=0)
         insert.mainloop()
         insert.update()
@@ -390,16 +384,68 @@ def settings():
     root = Tk()
     root.title("Settings")
 
-    create_backup_button = ttk.Button(root, text="create backup", command=db_backup)
-    create_backup_button.grid(column=0, row=0)
-    uplad_backup_button = ttk.Button(root, text="upload backup", command=db_upload)
-    uplad_backup_button.grid(column=0, row=1)
+    def edit_main_password():
+        my_var=msg.askyesnocancel("Edit?",\
+        "Edit" + ' '+ '?', icon='warning',default='no')
+        if my_var:
+            insert = Tk()
+            insert.title("Insert Data")
+            insert.resizable(False, False)
+            my_conn = get_conn()
+            bkg = "#636e72"
+
+            frame = ttk.Frame(insert)
+            pass_label = ttk.Label(frame, text="Your new password: ", font=('verdana',12))
+
+            password_label = ttk.Label(frame, text="Password: ", font=('verdana',12))
+            password_entry = ttk.Entry(frame, font=('verdana',12))
+
+            password_label_retype = ttk.Label(frame, text="Retype password: ", font=('verdana',12))
+            password_entry_retype = ttk.Entry(frame, font=('verdana',12))
+
+            # Funtion to insert a new record
+            def editData():
+                if password_entry.get() == password_entry_retype.get():
+                    if len(password_entry.get()) < 6:
+                        pass_label.config(text="Password must be at least 6 characters long.")
+                        return
+                    hash = hashlib.sha512()
+                    hash.update(password_entry.get().encode())
+                    hash_hex = hash.hexdigest()
+
+                    insert_query = """UPDATE password SET password = ?;"""
+                    vals = (hash_hex,)
+                    my_conn.execute(insert_query,vals)
+                    my_conn.commit()
+                    root.destroy()
+
+                    msg.showinfo(title=None, message="Account edited successfully")
+                    insert.destroy()
+                else:
+                    pass_label.configure(text="Passwords don't match.")
+
+        insert.bind('<Return>', lambda event=None: editData())
+
+        pass_label.grid(row=0, column=1)
+        password_label.grid(row=2, column=0, sticky='e')
+        password_entry.grid(row=2, column=1, pady=10, padx=10)
+
+        password_label_retype.grid(row=3, column=0, sticky='e')
+        password_entry_retype.grid(row=3, column=1, pady=10, padx=10)
+        frame.grid(row=0, column=0)
+        #my_show()
+        insert.mainloop()
+        insert.update()
+
+
+    change_password = ttk.Button(root, text="change password", command=edit_main_password)
+    change_password.grid(column=0, row=2)
 
     spacer = Label(root)
-    spacer.grid(column=0, row=2)
+    spacer.grid(column=0, row=3)
 
-    delete_db_button = ttk.Button(root, text="delete database", command=delete_db)
-    delete_db_button.grid(column=0, row=3)
+    # delete_db_button = ttk.Button(root, text="delete database", command=delete_db)
+    # delete_db_button.grid(column=0, row=4)
     root.mainloop()
 
 def add_suggested():
@@ -435,7 +481,7 @@ def add_suggested():
     entry_value = tk.Entry(root)
     entry_value.focus()
     entry_value.pack()
-    button = tk.Button(root, text="Add", command=add_to_json)
+    button = ttk.Button(root, text="Add", command=add_to_json)
     button.pack()
 
     root.mainloop()
