@@ -9,14 +9,13 @@ import hashlib
 import sqlite3
 import wmi
 
+#Generate hwid to prevent open databases from other computers
 def get_hwid():
     c = wmi.WMI()
-    # Get the hardware ID of the first disk drive
-    for disk in c.Win32_DiskDrive():
-        return disk.SerialNumber.strip()
-hwid = get_hwid()
-# print("Hardware ID:", hwid)
+    for board_id in c.Win32_BaseBoard():
+        return board_id.SerialNumber.strip()
 
+hwid = get_hwid()
 
 # read the key from a file
 with open('key.key', 'rb') as key_file:
@@ -44,10 +43,8 @@ my_conn.execute('''CREATE TABLE IF NOT EXISTS dane
                 login varchar(45) NOT NULL,
                 password varchar(300) NOT NULL)''')
 
-
 def insert_hwid():
     my_conn = get_conn()
-
     insert_query = """INSERT INTO hwid(hwid) VALUES (?)"""
     vals = (hwid,)
     my_conn.execute(insert_query,vals)
@@ -58,15 +55,13 @@ insert_hwid()
 def main():
     root = Tk()
     root.title("Vault")
-    root.geometry("850x350")
+    root.geometry("950x350")
     root.resizable(False, False)
-    root.minsize(850, 350)   # Lock the minimum size of the window
-    root.maxsize(850, 350)   # Lock the maximum size of the window
 
     my_conn = get_conn()
     display = ttk.Frame(root)
 
-    canvas = tk.Canvas(root, width=900, height=300)
+    canvas = tk.Canvas(root, width=950, height=300)
     scrollbar = ttk.Scrollbar(root, orient="vertical", command=canvas.yview)
 
     def on_mousewheel(event):
@@ -172,7 +167,6 @@ def main():
                 login_label.configure(text = "Wrong computer")
         root.bind('<Return>', lambda event=None: login())
 
-
     my_conn = get_conn()
     login_pass = my_conn.execute("""SELECT password FROM password""").fetchone()
     if login_pass is None:
@@ -210,7 +204,7 @@ def main():
 
             index += 1
             b=b+1
-    # Add the rows of data to the frame widget
+        # Add the rows of data to the frame widget
         r_set = my_conn.execute('SELECT id, platform, login, password FROM dane')
         for i, student in enumerate(r_set):
             for j in range(1,len(student)):
@@ -225,11 +219,13 @@ def main():
                 b.grid(row=i+2,column=j, padx=48)
 
             delete_button = ttk.Button(frame, text='Delete', width=8, command=lambda d=student[0], n=student[1]: my_delete(d, n))
-            delete_button.grid(row=i+2, column=len(student)+2)
-            copy_button = ttk.Button(frame, text='Copy', width=7, command=lambda id=student[0], name=student[1]: my_copy(id, name))
-            copy_button.grid(row=i+2, column=5)
+            delete_button.grid(row=i+2, column=len(student)+6)
+            copy_login_button = ttk.Button(frame, text='Copy login', width=10, command=lambda id=student[0], name=student[1]: login_copy(id, name))
+            copy_login_button.grid(row=i+2, column=5)
+            copy_button = ttk.Button(frame, text='Copy password', width=14, command=lambda id=student[0], name=student[1]: password_copy(id, name))
+            copy_button.grid(row=i+2, column=7)
             edit_button = ttk.Button(frame, text='Edit', width=6, command=lambda id=student[0], name=student[1]: my_edit(id, name))
-            edit_button.grid(row=i+2, column=7)
+            edit_button.grid(row=i+2, column=8)
 
 
         # Update the scroll region of the canvas widget
@@ -240,27 +236,50 @@ def main():
         my_var=msg.askyesnocancel("Edit?",\
         "Edit" + ' ' + name + '?', icon='warning',default='no')
         if my_var:
-            insert = Tk()
+            insert = tk.Toplevel()
+            insert.focus_set()
             insert.title("Insert Data")
             insert.resizable(False, False)
             my_conn = get_conn()
             bkg = "#636e72"
 
+            query = my_conn.execute("SELECT platform, login, password FROM dane WHERE id ="+str(id))
+            record = query.fetchone()
+
+            query1 = my_conn.execute("SELECT password FROM dane WHERE id ="+str(id))
+            record1 = query1.fetchone()
+    
+            for item in record1:
+                fernet = Fernet(key)
+                message = item
+                encrypted_message = message.encode('utf-8')
+
+                # decrypt the message
+                decrypted_message = fernet.decrypt(encrypted_message)
+                decrypted = decrypted_message.decode()
+
             frame = tk.Frame(insert, bg=bkg)
             site_label = tk.Label(frame, text="Platform: ", font=('verdana',12), bg=bkg)
             n = StringVar()
-            n = set()
+            n.set(record[0])
             site_entry = ttk.Combobox(frame, textvariable=n)
+
+
             # Here is saved sites 
             with open('sites_json.json', 'r') as file:
                 sites = json.load(file)
                 for site in sites:
                     site_entry['values'] = sites['site_name']
-            login_label = tk.Label(frame, text="Login: ", font=('verdana',12), bg=bkg)
-            login_entry = tk.Entry(frame, font=('verdana',12))
 
+            login = StringVar()
+            login.set(record[1])
+            login_label = tk.Label(frame, text="Login: ", font=('verdana',12), bg=bkg)
+            login_entry = tk.Entry(frame, textvariable=login, font=('verdana',12))
+
+            password = StringVar()
+            password.set(decrypted)
             password_label = tk.Label(frame, text="Password: ", font=('verdana',12), bg=bkg)
-            password_entry = tk.Entry(frame, font=('verdana',12))
+            password_entry = tk.Entry(frame, textvariable=password, font=('verdana',12))
 
             # Funtion to insert a new record
             def editData():
@@ -296,9 +315,7 @@ def main():
         password_label.grid(row=2, column=0, sticky='e')
         password_entry.grid(row=2, column=1, pady=10, padx=10)
         frame.grid(row=0, column=0)
-        #my_show()
         insert.mainloop()
-        insert.update()
 
     # Function to deleted selected row from database 
     def my_delete(id,name):
@@ -310,9 +327,8 @@ def main():
             
             msg.showinfo("Deleted","Record Deleted")
             refresh()
-            #my_show()
 
-    def my_copy(id, name):
+    def password_copy(id, name):
         my_var=msg.askyesnocancel("Copy?",\
             "Copy password of" + ' ' + name + '?', icon='info',default='no')
         if my_var:
@@ -331,6 +347,17 @@ def main():
                 pyperclip.copy(decrypted)
                 msg.showinfo(title=None, message="Copied to clipboard: " + decrypted)
 
+    def login_copy(id, name):
+        my_var=msg.askyesnocancel("Copy?",\
+            "Copy login of" + ' ' + name + '?', icon='info',default='no')
+        if my_var:
+            query = my_conn.execute("SELECT login FROM dane WHERE id ="+str(id))
+            record = query.fetchone()
+
+            for item in record:
+                pyperclip.copy(item)
+                msg.showinfo(title=None, message="Copied to clipboard: " + item)
+
     # Funtion to refresh all records from database
     def refresh():
         # Remove the old widgets from the frame
@@ -340,14 +367,12 @@ def main():
         display.update()
         my_show()
     display.pack(fill='both', anchor=CENTER, side='top', expand='1')
-    #my_show()
 
     # Funtion to insert a new record(window)
     def applytodb():
         insert = Tk()
         insert.title("Insert Data")
         my_conn = get_conn()
-        #c = connection.cursor()
         bkg = "#636e72"
 
         frame = tk.Frame(insert, bg=bkg)
@@ -356,6 +381,7 @@ def main():
         n = set()
         site_combo = ttk.Combobox(frame, textvariable=n)
         site_combo.set("Facebook")
+
         # Here is saved sites 
         with open('sites_json.json', 'r') as file:
             sites = json.load(file)
@@ -407,17 +433,17 @@ def main():
         ttk.Separator(master=app, orient=HORIZONTAL, style='blue.TSeparator', class_= ttk.Separator,
         takefocus= 1, cursor='plus').pack(fill=X, pady=2, expand=True)
 
-        generator_button = ttk.Button(app, text="Generator", command=gen)
-        add_to_db_button = ttk.Button(app, text="Add to database", command=applytodb)#applytodb #command=lambda: [applytodb(), refresh()]
-        add_site_json_button = ttk.Button(app, text="Add suggested site", command=add_suggested)
-        settings_button = ttk.Button(app, text="Settings", command=settings)
+        generator_button = ttk.Button(app, width=20, text="Generator", command=gen)
+        add_to_db_button = ttk.Button(app, width=20, text="Add account", command=applytodb)
+        add_site_json_button = ttk.Button(app, width=20, text="Add suggested site", command=add_suggested)
+        settings_button = ttk.Button(app, width=20, text="Settings", command=settings)
 
         generator_button.pack(side=LEFT, anchor=CENTER)
         add_to_db_button.pack(side=LEFT, anchor=CENTER)
         add_site_json_button.pack(side=LEFT, anchor=CENTER)
         settings_button.pack(side=LEFT, anchor=CENTER)
 
-        app.place(x=250, y=315)
+        app.place(x=210, y=315)
 
     root.mainloop()
 
@@ -475,17 +501,11 @@ def settings():
         password_label_retype.grid(row=3, column=0, sticky='e')
         password_entry_retype.grid(row=3, column=1, pady=10, padx=10)
         frame.grid(row=0, column=0)
-        #my_show()
         insert.mainloop()
         insert.update()
 
-
-    change_password = ttk.Button(root, text="change password", command=edit_main_password)
-    change_password.grid(column=0, row=2)
-
-    spacer = Label(root)
-    spacer.grid(column=0, row=3)
-    root.mainloop()
+    change_password = ttk.Button(root, text="Change main password", command=edit_main_password)
+    change_password.pack()
 
 def add_suggested():
     def add_to_json():
@@ -524,5 +544,4 @@ def add_suggested():
     button.pack()
 
     root.mainloop()
-
 main()
