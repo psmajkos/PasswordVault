@@ -1,13 +1,13 @@
-from tkinter import Tk, Label, StringVar, ttk, CENTER, LEFT, HORIZONTAL, X
+from tkinter import Tk, StringVar, ttk, CENTER, LEFT, HORIZONTAL, X
 import tkinter  as tk 
 from tkinter import messagebox as msg
 import pyperclip
-#from backup import db_upload, db_backup
 import json
 from cryptography.fernet import Fernet
 import hashlib
 import sqlite3
 import wmi
+from tkpassgen import gen
 
 #Generate hwid to prevent open databases from other computers
 def get_hwid():
@@ -137,9 +137,10 @@ def main():
 
         def login():
             hwid_check = my_conn.execute('SELECT hwid FROM hwid')
+            result = hwid_check.fetchone()[0]
             hwid_matched = False
             for hw in hwid_check:
-                if hwid == hw[0]:
+                if hwid == result: #hw[0]
                     hwid_matched = True
                     break
 
@@ -428,7 +429,6 @@ def main():
     
     def main_buttons():
         app = ttk.Frame(root, width=10, height=10)
-        from main_pass_gen import gen
 
         ttk.Separator(master=app, orient=HORIZONTAL, style='blue.TSeparator', class_= ttk.Separator,
         takefocus= 1, cursor='plus').pack(fill=X, pady=2, expand=True)
